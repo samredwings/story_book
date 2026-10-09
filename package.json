@@ -1,0 +1,60 @@
+{
+  "name": "img-vdo",
+  "version": "1.0.0",
+  "description": "IMG-VDO — Professional unrestricted NSFW Image-to-Video Storybook Platform",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "start": "turbo run start",
+    "lint": "turbo run lint",
+    "format": "turbo run format",
+    "type-check": "turbo run type-check",
+    "test": "turbo run test",
+    "test:unit": "turbo run test:unit",
+    "test:integration": "turbo run test:integration",
+    "test:e2e": "turbo run test:e2e",
+    "test:coverage": "turbo run test:coverage",
+    "db:migrate": "cd apps/api && npm run db:migrate",
+    "db:seed": "cd apps/api && npm run db:seed",
+    "db:studio": "cd apps/api && npm run db:studio",
+    "worker:dev": "cd apps/worker && npm run dev",
+    "worker:start": "cd apps/worker && npm run start"
+  },
+  "dependencies": {
+    "next": "^16.3.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.50.0",
+    "prettier": "^3.0.0",
+    "turbo": "^2.10.12",
+    "typescript": "^5.2.0"
+  },
+  "overrides": {
+    "uuid": "^11.1.1",
+    "bull": {
+      "uuid": "^11.1.1"
+    },
+    "quill": "^2.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "packageManager": "npm@11.19.0",
+  "allowScripts": {
+    "@prisma/client@5.22.0": true,
+    "esbuild@0.21.5": true,
+    "esbuild@0.28.1": true,
+    "msgpackr-extract@3.0.4": true
+  }
+}

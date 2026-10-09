@@ -1,0 +1,40 @@
+carnal-roulette/
+├── index.html                 — Entry point (iframe-ready)
+├── module-manifest.json       — Plugin contract for parent app
+├── Plugin Manifest.json       — Legacy manifest filename
+├── README.md
+├── css/
+│   └── main.css
+├── js/
+│   ├── engine_core.js         — ECS core
+│   ├── engine_event-bus.js    — Event bus
+│   ├── game-logic.js          — Round / intensity state
+│   ├── asset-loader.js        — Asset transfer / loading
+│   ├── story-asset-pipeline.js
+│   ├── audio.js
+│   ├── systems_audio-system.js
+│   ├── character-schema-validator.js
+│   ├── interaction.js         — WebXR controllers
+│   ├── systems_interaction-controller.js  — Desktop first-person
+│   ├── systems_penetration-physics.js
+│   ├── systems_penetration-targeting.js
+│   ├── systems_penetration-interaction.js
+│   ├── systems_ik-penetration.js
+│   ├── systems_narrative-tone.js
+│   ├── systems_dialogue-engine.js
+│   ├── systems_action-catalog.js
+│   ├── narrative-state-machine.js
+│   ├── fluid-system.js
+│   ├── recorder.js
+│   ├── ui-controller.js
+│   ├── vr-scene.js
+│   ├── plugin-interface.js
+│   ├── plugin-api.js
+│   ├── taboo-roulette.js
+│   └── app.js                 — Bootstrap
+├── docs/
+│   ├── architecture.txt
+│   ├── data-flow.txt
+│   └── directory-structure.txt
+└── tests/
+    └── automated-test-script.js

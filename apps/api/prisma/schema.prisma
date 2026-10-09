@@ -1,0 +1,726 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String  @id @default(cuid())
+  email     String  @unique
+  username  String  @unique
+  password  String
+  firstName String?
+  lastName  String?
+  avatar    String?
+
+  dateOfBirth                 DateTime?
+  termsAcceptedAt             DateTime?
+  privacyAcceptedAt           DateTime?
+  adultContentAcknowledgedAt  DateTime?
+  termsVersion                String?
+  privacyVersion              String?
+  adultContentVersion         String?
+
+  role   UserRole   @default(USER)
+  status UserStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  storyboards           Storyboard[]
+  characters            Character[]
+  stories               Story[]
+  auditLogs             AuditLog[]
+  apiKeys               ApiKey[]
+  userApiKeys           UserApiKey[]
+  mediaAssets           MediaAsset[]
+  roleplayMemories      RoleplayMemory[]
+  lorebookEntries       RoleplayLorebookEntry[]
+  roleplayRelationships RoleplayRelationship[]
+  roleplaySceneStates   RoleplaySceneState[]
+  videoCallSessions     VideoCallSession[]
+  generationJobs        GenerationJob[]
+
+  @@index([email])
+  @@index([username])
+}
+
+model Storyboard {
+  id          String  @id @default(cuid())
+  title       String
+  description String?
+  thumbnail   String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  characters Character[]
+  scenes     Scene[]
+
+  status StoryboardStatus @default(DRAFT)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Character {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  imageUrl    String
+
+  personality String? // JSON string with traits
+  appearance  String? // JSON string with physical details
+  background  String? // Character backstory
+  traits      String? // JSON array of traits
+  sexualRole    String? // dominant|submissive|switch|slut|prey|predator|other
+  kinks         String? // JSON string array
+  bodyDetails   String?
+  voiceStyle    String?
+  limits        String? // JSON string array
+  preferredActs String? // JSON string array
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  storyboards      Storyboard[]
+  sceneCharacters  SceneCharacter[]
+  roleplayMemories RoleplayMemory[]
+  lorebookEntries  RoleplayLorebookEntry[]
+  relationshipsAsA RoleplayRelationship[]  @relation("RelationshipCharacterA")
+  relationshipsAsB RoleplayRelationship[]  @relation("RelationshipCharacterB")
+  visualProfile    CharacterVisualProfile?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([name])
+}
+
+model Story {
+  id      String @id @default(cuid())
+  title   String
+  prompt  String
+  content String // Generated story text
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  genre         StoryGenre
+  contentRating ContentRating
+  tags          String[] // Array of tags
+
+  characters String[] // Array of character IDs used in story
+
+  scenes      Scene[]
+  mediaAssets MediaAsset[]
+
+  status      StoryStatus @default(DRAFT)
+  nsfwScore   Float       @default(1.0)
+  nsfwFlagged Boolean     @default(false)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+
+  @@index([userId])
+  @@index([genre])
+  @@index([contentRating])
+}
+
+model Scene {
+  id          String  @id @default(cuid())
+  title       String
+  description String?
+  sceneNumber Int
+
+  storyId String
+  story   Story  @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  storyboardId String?
+  storyboard   Storyboard? @relation(fields: [storyboardId], references: [id], onDelete: SetNull)
+
+  characters SceneCharacter[]
+
+  imageUrl String?
+  videoUrl String?
+
+  generationJobId String?
+  generationJob   GenerationJob? @relation(fields: [generationJobId], references: [id])
+
+  prompt         String?
+  motionStrength Float   @default(0.7)
+  duration       Int     @default(5)
+
+  status SceneStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([storyId])
+  @@index([storyboardId])
+  @@index([status])
+}
+
+model SceneCharacter {
+  id String @id @default(cuid())
+
+  sceneId String
+  scene   Scene  @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  roleInScene String? // e.g., "protagonist", "antagonist", "love_interest"
+  dialogues   String? // JSON array of dialogue lines
+  actions     String? // JSON array of actions/movements
+
+  @@unique([sceneId, characterId])
+  @@index([sceneId])
+  @@index([characterId])
+}
+
+model GenerationJob {
+  id String @id @default(cuid())
+
+  sceneId String
+  scenes  Scene[]
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  provider VideoProvider
+  status   JobStatus     @default(QUEUED)
+  progress Int           @default(0)
+
+  prompt         String
+  imageUrl       String
+  motionStrength Float
+  duration       Int
+
+  resultVideoUrl  String?
+  resultThumbnail String?
+
+  errorMessage String?
+  retryCount   Int     @default(0)
+  maxRetries   Int     @default(3)
+
+  metadata String? // JSON string with additional metadata
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  @@index([status])
+  @@index([provider])
+  @@index([createdAt])
+  @@index([userId])
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  action     String
+  entityType String
+  entityId   String
+  changes    String? // JSON string with before/after values
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([entityType])
+  @@index([createdAt])
+}
+
+model ApiKey {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  key  String @unique
+  name String
+
+  lastUsed  DateTime?
+  expiresAt DateTime?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([key])
+}
+
+model UserApiKey {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  provider String // "openai", "runway", "pika", "elevenlabs", "replicate"
+  key      String // Encrypted or plain-text API key
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, provider])
+  @@index([userId])
+  @@index([provider])
+}
+
+model MediaAsset {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  url         String // URL or base64 data URI of the uploaded media
+  assetType   MediaAssetType @default(IMAGE) // IMAGE or VIDEO
+  mimeType    String?
+  sizeBytes   Int?
+  storageKind StorageKind    @default(REMOTE)
+
+  label       String? // User-friendly label (e.g., "Character A shot")
+  description String? // Auto-generated or user-provided description
+  metadata    String? // JSON string with additional metadata (dimensions, etc.)
+
+  storyId String? // Optional link to a story this asset is used in
+  story   Story?  @relation(fields: [storyId], references: [id], onDelete: SetNull)
+
+  sceneOrder Int? // Order in the story scene sequence
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([storyId])
+  @@index([assetType])
+}
+
+// Enums
+enum UserRole {
+  ADMIN
+  CREATOR
+  USER
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum StoryboardStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum StoryGenre {
+  ROMANCE
+  FANTASY
+  SCI_FI
+  DRAMA
+  MYSTERY
+  ADVENTURE
+  EROTICA
+  THRILLER
+  HORROR
+  COMEDY
+  OTHER
+  BANGLA_INCEST_CHOTI
+}
+
+enum ContentRating {
+  G
+  PG
+  PG_13
+  R
+  NC_17
+  X
+  XXX
+}
+
+enum StoryStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SceneStatus {
+  PENDING
+  PROCESSING
+  GENERATING_VIDEO
+  COMPLETED
+  FAILED
+}
+
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  GENERATING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum VideoProvider {
+  RUNWAY
+  PIKA
+  COGVIDEOX
+}
+
+enum MediaAssetType {
+  IMAGE
+  VIDEO
+}
+
+enum StorageKind {
+  LOCAL
+  REMOTE
+}
+
+// -----------------------------------------------------------------------------
+// Roleplay conversation core
+// -----------------------------------------------------------------------------
+
+enum RoleplayConversationStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum RoleplayParticipantType {
+  USER
+  CHARACTER
+}
+
+enum RoleplayMessageRole {
+  USER
+  CHARACTER
+  SYSTEM
+}
+
+enum RoleplayMessageStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model RoleplayConversation {
+  id     String @id @default(cuid())
+  userId String
+
+  title    String
+  status   RoleplayConversationStatus @default(ACTIVE)
+  language String                     @default("en")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participants      RoleplayParticipant[]
+  messages          RoleplayMessage[]
+  memories          RoleplayMemory[]
+  lorebookEntries   RoleplayLorebookEntry[]
+  relationships     RoleplayRelationship[]
+  sceneState        RoleplaySceneState?
+  videoCallSessions VideoCallSession[]
+
+  @@index([userId])
+  @@index([userId, updatedAt])
+}
+
+model RoleplayParticipant {
+  id             String @id @default(cuid())
+  conversationId String
+
+  type RoleplayParticipantType
+
+  userId      String?
+  characterId String?
+
+  displayName String
+  active      Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  joinedAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  conversation RoleplayConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  messages RoleplayMessage[]
+
+  @@index([conversationId])
+  @@index([characterId])
+  @@index([userId])
+}
+
+model RoleplayMessage {
+  id             String  @id @default(cuid())
+  conversationId String
+  participantId  String?
+
+  role    RoleplayMessageRole
+  content String
+  status  RoleplayMessageStatus @default(COMPLETED)
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  conversation RoleplayConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  participant RoleplayParticipant? @relation(fields: [participantId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@index([participantId])
+}
+
+enum RoleplayMemoryType {
+  SHORT_TERM
+  EPISODIC
+  FACT
+  RELATIONSHIP
+  CHARACTER
+  WORLD
+}
+
+enum RoleplayMemoryScope {
+  CONVERSATION
+  CHARACTER
+  SHARED
+  PRIVATE
+}
+
+model RoleplayMemory {
+  id             String  @id @default(cuid())
+  userId         String
+  conversationId String
+  characterId    String?
+
+  type       RoleplayMemoryType
+  scope      RoleplayMemoryScope
+  content    String
+  importance Float               @default(0.5)
+  metadata   Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation RoleplayConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  character    Character?           @relation(fields: [characterId], references: [id], onDelete: SetNull)
+
+  @@index([userId, updatedAt])
+  @@index([conversationId, updatedAt])
+  @@index([conversationId, type])
+  @@index([characterId])
+}
+
+model RoleplayLorebookEntry {
+  id             String  @id @default(cuid())
+  userId         String
+  conversationId String?
+  characterId    String?
+
+  title    String
+  content  String
+  keywords String[]
+  priority Int      @default(0)
+  enabled  Boolean  @default(true)
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation RoleplayConversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  character    Character?            @relation(fields: [characterId], references: [id], onDelete: SetNull)
+
+  @@index([userId, updatedAt])
+  @@index([conversationId, enabled, priority])
+  @@index([characterId, enabled])
+}
+
+model RoleplayRelationship {
+  id             String @id @default(cuid())
+  userId         String
+  conversationId String
+  characterAId   String
+  characterBId   String
+
+  type     String
+  score    Float    @default(0)
+  facts    String[]
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation RoleplayConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  characterA   Character            @relation("RelationshipCharacterA", fields: [characterAId], references: [id], onDelete: Cascade)
+  characterB   Character            @relation("RelationshipCharacterB", fields: [characterBId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, characterAId, characterBId])
+  @@index([userId, updatedAt])
+  @@index([conversationId, updatedAt])
+  @@index([characterAId])
+  @@index([characterBId])
+}
+
+enum RoleplayCameraMode {
+  FIRST_PERSON
+  THIRD_PERSON
+  OVER_SHOULDER
+  CINEMATIC
+}
+
+model RoleplaySceneState {
+  id             String             @id @default(cuid())
+  userId         String
+  conversationId String             @unique
+  description    String
+  location       String?
+  cameraMode     RoleplayCameraMode @default(THIRD_PERSON)
+  participantIds String[]
+  variables      Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation RoleplayConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+}
+
+model CharacterVisualProfile {
+  id          String @id @default(cuid())
+  characterId String @unique
+
+  identityPrompt    String
+  negativePrompt    String?
+  style             String?
+  seed              Int?
+  referenceAssetIds String[]
+  locked            Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@index([locked])
+}
+
+enum VideoCallSessionStatus {
+  CREATED
+  CONNECTING
+  ACTIVE
+  ENDED
+  FAILED
+}
+
+model VideoCallSession {
+  id             String                 @id @default(cuid())
+  userId         String
+  conversationId String
+  roomId         String                 @unique
+  status         VideoCallSessionStatus @default(CREATED)
+  provider       String                 @default("webrtc")
+  audioEnabled   Boolean                @default(true)
+  videoEnabled   Boolean                @default(true)
+  metadata       Json?
+  startedAt      DateTime?
+  endedAt        DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation RoleplayConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+  @@index([conversationId, status])
+}
+
+ // ─── Bangla Choti Knowledge Base ───────────────────────────────────────────
+
+model ChotiCorpus {
+  id          String   @id @default(cuid())
+
+  title       String?
+  content     String   @db.Text
+  summary     String?  @db.Text
+
+  relationshipType  String?              // "মা-ছেলে", "বোন-ভাই", "শাশুড়ি-জামাই", "খালা-ভাগনে", etc.
+  actType           String?              // "oral", "anal", "creampie", "forced", "romantic", "group"
+  intensity         Int      @default(8) // 1-10
+  languageStyle     String?              // "pure_bangla", "mixed", "very_vulgar", "literary"
+
+  tags        String[]
+  characters  String[]
+
+  source      String?                    // "user_upload", "scraped", "generated", "manual"
+  quality     Int      @default(5)       // 1-10
+  isApproved  Boolean  @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([relationshipType])
+  @@index([actType])
+  @@index([intensity])
+  @@index([isApproved])
+}
+
+model ChotiPhrase {
+  id          String   @id @default(cuid())
+
+  bangla      String
+  meaning     String?
+  category    String   // "dirty_talk", "body_part", "action", "orgasm", "degradation", "affection", "begging"
+  intensity   Int      @default(7)
+
+  usageCount  Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([category])
+  @@index([intensity])
+}
+
+model ChotiCharacterArchetype {
+  id              String   @id @default(cuid())
+
+  name            String
+  description     String   @db.Text
+  personality     String?  @db.Text
+  sexualBehavior  String?  @db.Text
+  commonDialogues String[]
+  kinks           String[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
