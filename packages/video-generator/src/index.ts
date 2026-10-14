@@ -16,17 +16,6 @@ export {
 } from "./storage";
 export type { StoredObject, StorageBackend, StoreObjectOptions } from "./storage";
 
-/**
- * Video Generation Provider Interface
- * All providers support unrestricted content generation
- *
- * TIER SYSTEM:
- * - Free (default): CogVideoX via HuggingFace Inference API (free account)
- * - BYOK: Runway ML, Pika Labs (require user's own paid API key)
- *
- * Generated binaries are persisted to S3/MinIO (or local uploads/) and
- * returned as HTTP URLs — never as data: URLs.
- */
 export interface VideoGeneratorProvider {
   name: VideoProvider;
   generate(data: VideoGenerationRequest): Promise<VideoGenerationResult>;
@@ -46,7 +35,10 @@ async function persistResult(
     });
 
     let thumbnail = result.thumbnail;
-    if (thumbnail && (thumbnail.startsWith("data:") || /^https?:\/\//i.test(thumbnail))) {
+    if (
+      thumbnail &&
+      (thumbnail.startsWith("data:") || /^https?:\/\//i.test(thumbnail))
+    ) {
       try {
         const thumb = await storeFromUrl(thumbnail, {
           prefix: "thumbnails",
@@ -99,24 +91,16 @@ async function persistBuffer(
   };
 }
 
-// ─── CogVideoX Provider (FREE — Default) ────────────────────────────────────
-
 class CogVideoXProvider implements VideoGeneratorProvider {
   name: VideoProvider = VideoProvider.COGVIDEOX;
 
   async generate(data: VideoGenerationRequest): Promise<VideoGenerationResult> {
     const hfKey = process.env.HUGGINGFACE_API_KEY;
     if (!hfKey) {
-      console.warn(
+      throw new Error(
         "CogVideoX: HUGGINGFACE_API_KEY not configured. " +
           "Sign up at huggingface.co for a free token.",
       );
-      return {
-        videoUrl: "",
-        thumbnail: "",
-        provider: VideoProvider.COGVIDEOX,
-        duration: data.duration,
-      };
     }
 
     const models = [
@@ -139,7 +123,7 @@ class CogVideoXProvider implements VideoGeneratorProvider {
           {
             headers: { Authorization: `Bearer ${hfKey}` },
             responseType: "arraybuffer",
-            timeout: 300000,
+            timeout: 300_000,
           },
         );
 
@@ -151,21 +135,20 @@ class CogVideoXProvider implements VideoGeneratorProvider {
         return persistBuffer(body, data, VideoProvider.COGVIDEOX);
       } catch (error) {
         lastError = error;
-        console.warn(`${model} failed, trying next:`, error instanceof Error ? error.message : error);
+        console.warn(
+          `${model} failed, trying next:`,
+          error instanceof Error ? error.message : error,
+        );
       }
     }
 
-    console.error("CogVideoX completely failed:", lastError);
-    return {
-      videoUrl: "",
-      thumbnail: "",
-      provider: VideoProvider.COGVIDEOX,
-      duration: data.duration,
-    };
+    throw new Error(
+      `CogVideoX completely failed after trying all models: ${
+        lastError instanceof Error ? lastError.message : String(lastError)
+      }`,
+    );
   }
 }
-
-// ─── Runway ML Provider (BYOK) ───────────────────────────────────────────────
 
 class RunwayProvider implements VideoGeneratorProvider {
   name: VideoProvider = VideoProvider.RUNWAY;
@@ -189,7 +172,7 @@ class RunwayProvider implements VideoGeneratorProvider {
       },
       {
         headers: { Authorization: `Bearer ${apiKey}` },
-        timeout: 120000,
+        timeout: 120_000,
       },
     );
 
@@ -201,8 +184,6 @@ class RunwayProvider implements VideoGeneratorProvider {
     };
   }
 }
-
-// ─── Pika Labs Provider (BYOK) ───────────────────────────────────────────────
 
 class PikaProvider implements VideoGeneratorProvider {
   name: VideoProvider = VideoProvider.PIKA;
@@ -224,7 +205,7 @@ class PikaProvider implements VideoGeneratorProvider {
       },
       {
         headers: { Authorization: `Bearer ${apiKey}` },
-        timeout: 120000,
+        timeout: 120_000,
       },
     );
 
@@ -236,8 +217,6 @@ class PikaProvider implements VideoGeneratorProvider {
     };
   }
 }
-
-// ─── Factory ──────────────────────────────────────────────────────────────────
 
 const providers: Record<VideoProvider, VideoGeneratorProvider> = {
   RUNWAY: new RunwayProvider(),
@@ -256,7 +235,6 @@ export async function generateVideo(
 ): Promise<VideoGenerationResult> {
   const provider = getProvider(data.provider);
   const result = await provider.generate(data);
-  // CogVideoX already persisted the buffer. Re-host remaining HTTP/data URLs.
   if (result.storageKey) return result;
   return persistResult(result, data.sceneId);
 }

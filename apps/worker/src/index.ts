@@ -5,6 +5,7 @@ import { Queue, Worker } from "bullmq";
 import IORedis from "ioredis";
 import { PrismaClient } from "@prisma/client";
 import pino from "pino";
+import { createServer } from "http";
 import { generateVideo } from "@img-vdo/video-generator";
 import type { GenerationJobData } from "@img-vdo/shared";
 
@@ -14,13 +15,12 @@ const logger = pino({
 });
 const prisma = new PrismaClient();
 
-// ─── Video Generation Queue ───────────────────────────────────────────────────
-
 const redisConnection = new IORedis(
   process.env.REDIS_URL || "redis://localhost:6379",
   { maxRetriesPerRequest: null },
 );
-const videoQueue = new Queue<GenerationJobData>("video-generation", {
+
+const videoQueue = new Queue("video-generation", {
   connection: redisConnection,
   defaultJobOptions: {
     attempts: 3,
@@ -29,94 +29,97 @@ const videoQueue = new Queue<GenerationJobData>("video-generation", {
     removeOnFail: 50,
   },
 });
+
 const MAX_ATTEMPTS = 3;
 
-// ─── Queue Processor ──────────────────────────────────────────────────────────
-
-const videoWorker = new Worker<GenerationJobData>("video-generation", async (job) => {
-  const data = job.data;
-  logger.info(
-    { jobId: job.id, sceneId: data.sceneId, provider: data.provider },
-    "Processing video generation job",
-  );
-
-  await prisma.generationJob.update({
-    where: { id: data.jobId },
-    data: { status: "PROCESSING", progress: 10 },
-  });
-
-  try {
-    const result = await generateVideo({
-      sceneId: data.sceneId,
-      imageUrl: data.imageUrl,
-      prompt: data.prompt,
-      duration: data.duration,
-      motionStrength: data.motionStrength,
-      provider: data.provider,
-      aspectRatio: data.metadata?.aspectRatio,
-      quality: data.metadata?.quality,
-    });
-
-    if (!result.videoUrl) {
-      throw new Error(`${result.provider} returned no video URL`);
-    }
-
-    if (result.videoUrl.startsWith("data:")) {
-      throw new Error("Refusing to persist a data-URL video; storage upload is required");
-    }
-
-    await prisma.generationJob.update({
-      where: { id: data.jobId },
-      data: {
-        status: "COMPLETED",
-        progress: 100,
-        resultVideoUrl: result.videoUrl,
-        resultThumbnail: result.thumbnail,
-        completedAt: new Date(),
-      },
-    });
-
-    await prisma.scene.update({
-      where: { id: data.sceneId },
-      data: {
-        videoUrl: result.videoUrl,
-        status: "COMPLETED",
-      },
-    });
-
+const videoWorker = new Worker(
+  "video-generation",
+  async (job) => {
+    const data = job.data as GenerationJobData;
     logger.info(
-      { jobId: job.id, sceneId: data.sceneId },
-      "Video generation completed successfully",
+      { jobId: job.id, sceneId: data.sceneId, provider: data.provider },
+      "Processing video generation job",
     );
-    return result;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    const isFinalAttempt = job.attemptsMade + 1 >= MAX_ATTEMPTS;
 
     await prisma.generationJob.update({
       where: { id: data.jobId },
-      data: {
-        status: isFinalAttempt ? "FAILED" : "QUEUED",
-        progress: isFinalAttempt ? 0 : 10,
-        errorMessage: message,
-        retryCount: { increment: 1 },
-      },
+      data: { status: "PROCESSING", progress: 10 },
     });
 
-    if (isFinalAttempt) {
+    try {
+      const result = await generateVideo({
+        sceneId: data.sceneId,
+        imageUrl: data.imageUrl,
+        prompt: data.prompt,
+        duration: data.duration,
+        motionStrength: data.motionStrength,
+        provider: data.provider,
+        aspectRatio: data.metadata?.aspectRatio,
+        quality: data.metadata?.quality,
+      });
+
+      if (!result.videoUrl) {
+        throw new Error(`${result.provider} returned no video URL`);
+      }
+
+      if (result.videoUrl.startsWith("data:")) {
+        throw new Error("Refusing to persist a data-URL video; storage upload is required");
+      }
+
+      await prisma.generationJob.update({
+        where: { id: data.jobId },
+        data: {
+          status: "COMPLETED",
+          progress: 100,
+          resultVideoUrl: result.videoUrl,
+          resultThumbnail: result.thumbnail,
+          completedAt: new Date(),
+        },
+      });
+
       await prisma.scene.update({
         where: { id: data.sceneId },
-        data: { status: "FAILED" },
+        data: {
+          videoUrl: result.videoUrl,
+          status: "COMPLETED",
+        },
       });
-    }
 
-    logger.error({ jobId: job.id, error: message }, "Video generation failed");
-    throw error;
-  }
-}, { connection: redisConnection });
+      logger.info(
+        { jobId: job.id, sceneId: data.sceneId },
+        "Video generation completed successfully",
+      );
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      const isFinalAttempt = (job.attemptsMade ?? 0) + 1 >= MAX_ATTEMPTS;
+
+      await prisma.generationJob.update({
+        where: { id: data.jobId },
+        data: {
+          status: isFinalAttempt ? "FAILED" : "QUEUED",
+          progress: isFinalAttempt ? 0 : 10,
+          errorMessage: message,
+          retryCount: { increment: 1 },
+        },
+      });
+
+      if (isFinalAttempt) {
+        await prisma.scene.update({
+          where: { id: data.sceneId },
+          data: { status: "FAILED" },
+        });
+      }
+
+      logger.error({ jobId: job.id, error: message }, "Video generation failed");
+      throw error;
+    }
+  },
+  { connection: redisConnection },
+);
 
 videoWorker.on("completed", (job) => {
-  logger.info({ jobId: job.id }, "Job completed");
+  logger.info({ jobId: job?.id }, "Job completed");
 });
 
 videoWorker.on("failed", (job, err) => {
@@ -127,28 +130,44 @@ videoWorker.on("stalled", (jobId) => {
   logger.warn({ jobId }, "Job stalled");
 });
 
-async function shutdown() {
-  logger.info("Shutting down worker...");
+const PORT = parseInt(process.env.WORKER_PORT || "3002");
+
+const healthServer = createServer(async (req, res) => {
+  if (req.url === "/health") {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      await redisConnection.ping();
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ status: "ok", timestamp: new Date().toISOString() }));
+    } catch (err) {
+      res.writeHead(503, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ status: "degraded", error: (err as Error).message }));
+    }
+    return;
+  }
+  res.writeHead(404);
+  res.end("Not found");
+});
+
+healthServer.listen(PORT, "0.0.0.0", () => {
+  logger.info(`Worker health server listening on 0.0.0.0:${PORT}`);
+});
+
+async function shutdown(signal: string) {
+  logger.info({ signal }, "Shutting down worker...");
   await videoWorker.close();
   await videoQueue.close();
   await redisConnection.quit();
   await prisma.$disconnect();
-  process.exit(0);
+  healthServer.close(() => {
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 10_000).unref();
 }
 
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
 
-const PORT = parseInt(process.env.WORKER_PORT || "3002");
-
-logger.info("╔══════════════════════════════════════════════════════╗");
-logger.info("║     IMG-VDO Worker — Background Job Processor     ║");
-logger.info("╠══════════════════════════════════════════════════════╣");
-logger.info(
-  `║  Redis:      ${process.env.REDIS_URL || "redis://localhost:6379"}  ║`,
-);
-logger.info("║  Queues:     video-generation                       ║");
-logger.info("║  Mode:       UNRESTRICTED — no content filters      ║");
-logger.info("╚══════════════════════════════════════════════════════╝");
+logger.info("IMG-VDO Worker started");
 
 export { videoQueue };

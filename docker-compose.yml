@@ -3,15 +3,15 @@ services:
     image: postgres:16-alpine
     container_name: img-vdo-postgres
     environment:
-      POSTGRES_USER: storybook
-      POSTGRES_PASSWORD: storybook123
-      POSTGRES_DB: image_video_storybook
+      POSTGRES_USER: ${POSTGRES_USER:-storybook}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-storybook123}
+      POSTGRES_DB: ${POSTGRES_DB:-image_video_storybook}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U storybook -d image_video_storybook"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -32,11 +32,11 @@ services:
       start_period: 5s
 
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
     container_name: img-vdo-minio
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin123
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -51,16 +51,16 @@ services:
       start_period: 15s
 
   minio-init:
-    image: minio/mc:latest
+    image: minio/mc:RELEASE.2024-11-21T17-21-54Z
     container_name: img-vdo-minio-init
     depends_on:
       minio:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      mc alias set local http://minio:9000 minioadmin minioadmin123 &&
-      mc mb --ignore-existing local/video-storage &&
-      mc anonymous set download local/video-storage || true
+        mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD} &&
+        mc mb --ignore-existing local/video-storage &&
+        mc anonymous set download local/video-storage || true
       "
     restart: "no"
 
@@ -80,34 +80,26 @@ services:
     environment:
       NODE_ENV: production
       API_PORT: 3001
-      DATABASE_URL: postgresql://storybook:storybook123@postgres:5432/image_video_storybook
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: change-me-to-a-long-random-secret-at-least-32-chars
-      CORS_ORIGIN: http://localhost:3000
-      PUBLIC_API_URL: http://localhost:3001
-      STORAGE_BACKEND: s3
-      AWS_ACCESS_KEY_ID: minioadmin
-      AWS_SECRET_ACCESS_KEY: minioadmin123
-      AWS_REGION: us-east-1
-      AWS_S3_BUCKET: video-storage
-      S3_ENDPOINT: http://minio:9000
-      S3_PUBLIC_URL: http://localhost:9000/video-storage
-      REQUIRE_AGE_VERIFICATION: "true"
-      MIN_AGE: "18"
-      ADULT_CONTENT_ALLOWED: "true"
-      UNRESTRICTED_MODE: "true"
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      PUBLIC_API_URL: ${PUBLIC_API_URL}
+      STORAGE_BACKEND: ${STORAGE_BACKEND}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL}
+      HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
       - "3001:3001"
     volumes:
       - api_uploads:/app/uploads
     healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
-        ]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -131,23 +123,21 @@ services:
         condition: service_started
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://storybook:storybook123@postgres:5432/image_video_storybook
-      REDIS_URL: redis://redis:6379
-      STORAGE_BACKEND: s3
-      AWS_ACCESS_KEY_ID: minioadmin
-      AWS_SECRET_ACCESS_KEY: minioadmin123
-      AWS_REGION: us-east-1
-      AWS_S3_BUCKET: video-storage
-      S3_ENDPOINT: http://minio:9000
-      S3_PUBLIC_URL: http://localhost:9000/video-storage
-      HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY:-}
-      RUNWAY_API_KEY: ${RUNWAY_API_KEY:-}
-      PIKA_API_KEY: ${PIKA_API_KEY:-}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      STORAGE_BACKEND: ${STORAGE_BACKEND}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL}
+      HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     volumes:
       - api_uploads:/app/uploads
     restart: unless-stopped
 
-  # One-shot migrate helper: docker compose run --rm migrate
   migrate:
     build:
       context: .
@@ -158,7 +148,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://storybook:storybook123@postgres:5432/image_video_storybook
+      DATABASE_URL: ${DATABASE_URL}
     working_dir: /app/apps/api
     entrypoint: ["npx", "prisma", "migrate", "deploy"]
     restart: "no"

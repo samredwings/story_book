@@ -62,6 +62,31 @@ docker build --target worker -t img-vdo-worker .
 Services: `postgres`, `redis`, `minio` (+ bucket init), `api` (`:3001`), `worker`.  
 Set `HUGGINGFACE_API_KEY` (and optional BYOK keys) in the environment or a `.env` file before starting the worker.
 
+### Azure App Service (web frontend)
+
+The web app is exported as static files during `next build`. For a Linux Node 20 App
+Service, deploy the repository root with build automation enabled, then set these
+application settings:
+
+```text
+PLATFORM_NAME=nodejs
+SKIP_PLATFORM_DETECTION=true
+NODE_VERSION=20
+RUN_BUILD_COMMAND=npm run build --workspace=@img-vdo/web
+NEXT_PUBLIC_API_URL=https://<your-api-host>
+```
+
+Set the App Service startup command to:
+
+```bash
+npm run start --workspace=@img-vdo/web
+```
+
+Pinning Oryx to Node prevents it from treating the Android Gradle sources under
+`apps/web/android` as a Java application. The startup command serves the static
+export from `apps/web/dist`; the API must be deployed separately, and
+`NEXT_PUBLIC_API_URL` must point to that API when the frontend is built.
+
 ## Project Structure
 
 ```

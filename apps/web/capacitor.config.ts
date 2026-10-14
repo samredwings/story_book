@@ -1,23 +1,24 @@
-import type { CapacitorConfig } from "@capacitor/cli";
+import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: "com.storybook.studio",
-  appName: "Storybook Studio",
-  webDir: "out",
+  appId: 'com.imgvdo.app',
+  appName: 'IMG-VDO Storybook',
+  webDir: 'dist',
   server: {
-    androidScheme: "https",
-    // Allow navigation to API host if needed for OAuth-style redirects
     cleartext: true,
+    androidScheme: 'https',
   },
   android: {
-    allowMixedContent: true,
-    backgroundColor: "#0a0a0a",
+    buildOptions: {
+      keystorePath: undefined,
+      keystoreAlias: undefined,
+    },
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 800,
-      backgroundColor: "#0a0a0a",
-      showSpinner: false,
+      launchShowDuration: 2000,
+      backgroundColor: '#0a0a0a',
+      androidScaleType: 'CENTER_CROP',
     },
   },
 };

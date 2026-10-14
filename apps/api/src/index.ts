@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
-import "express-async-errors";
+import helmet from "helmet";
+import compression from "compression";
 import pinoHttp from "pino-http";
 import { createClient } from "redis";
 
@@ -41,19 +42,24 @@ import { localStorageRoot } from "@img-vdo/video-generator";
 
 const app = express();
 
-// ─── Security & parsing middleware ───────────────────────────────────────
-
 app.set("trust proxy", config.trustProxy);
 app.disable("x-powered-by");
 
-/**
- * CORS for web + Capacitor (Android WebView origin is typically https://localhost).
- * credentials: true requires reflecting a specific allowed origin (not *).
- */
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
+
+app.use(compression());
+
 app.use(
   cors({
     origin(origin, callback) {
-      // Non-browser clients (curl, native) often send no Origin
       if (!origin) {
         return callback(null, true);
       }
@@ -66,27 +72,14 @@ app.use(
     maxAge: 600,
   }),
 );
+
 app.use(pinoHttp({ logger }));
 app.use(globalRateLimiter);
 app.use(express.json({ limit: config.bodyLimit }));
 app.use(express.urlencoded({ limit: config.bodyLimit, extended: true }));
 
-// Disable caching on auth responses
-app.use((req, res, next) => {
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "DENY");
-  res.setHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
-  res.setHeader("Permissions-Policy", "camera=(self), microphone=(self), geolocation=()");
-  res.setHeader("Referrer-Policy", "no-referrer");
-  if (config.isProduction) {
-    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-  }
-  next();
-});
-
-// ─── Health check (real, with DB + Redis probe) ──────────────────────────
-
 let redisCheck: ReturnType<typeof createClient> | null = null;
+
 async function getRedis() {
   if (redisCheck) return redisCheck;
   redisCheck = createClient({ url: config.redis.url });
@@ -95,8 +88,11 @@ async function getRedis() {
   return redisCheck;
 }
 
-app.get("/health", async (req, res) => {
-  const result: Record<string, string> = { status: "ok", timestamp: new Date().toISOString() };
+app.get("/health", async (_req, res) => {
+  const result: Record<string, string> = {
+    status: "ok",
+    timestamp: new Date().toISOString(),
+  };
   try {
     await prisma.$queryRaw`SELECT 1`;
     result.database = "ok";
@@ -115,14 +111,9 @@ app.get("/health", async (req, res) => {
   res.status(result.status === "ok" ? 200 : 503).json(result);
 });
 
-// ─── Public routes ───────────────────────────────────────────────────────
-
 app.use("/api/auth", authRoutes);
 app.use("/api/models", modelsRoutes);
 app.use("/api/offline", offlineRoutes);
-
-// ─── Protected routes ────────────────────────────────────────────────────
-// Adult-generation routes require age + legal consent after auth.
 
 const adult = [authMiddleware, requireAdultConsent] as const;
 
@@ -142,7 +133,7 @@ app.use("/api/roleplay/memories", ...adult, memoriesRoutes);
 app.use("/api/roleplay/lorebook", ...adult, lorebookRoutes);
 app.use("/api/roleplay/relationships", ...adult, relationshipsRoutes);
 app.use("/api/roleplay/scene-state", ...adult, sceneStateRoutes);
-app.use("/api/characters", ...adult, visualProfileRoutes);
+app.use("/api/characters/:id/visual-profile", ...adult, visualProfileRoutes);
 app.use("/api/video-calls", ...adult, videoCallRoutes);
 app.use("/api/unrestricted", ...adult, unrestrictedRoutes);
 app.use("/api/user/keys", authMiddleware, userKeysRoutes);
@@ -150,7 +141,6 @@ app.use("/api/media-assets", ...adult, mediaAssetsRoutes);
 app.use("/api/sex-game", ...adult, sexGameRoutes);
 app.use("/api/me", authMiddleware, gdprRoutes);
 
-// Local object-storage fallback (used when STORAGE_BACKEND=local)
 app.use(
   "/media",
   express.static(localStorageRoot(), {
@@ -161,18 +151,14 @@ app.use(
   }),
 );
 
-// ─── 404 + error handler ─────────────────────────────────────────────────
-
-app.use((req, res) => {
-  res.status(404).json({ error: "Not found", path: req.path });
+app.use((_req, res) => {
+  res.status(404).json({ error: "Not found" });
 });
 app.use(errorHandler);
 
-// ─── Bootstrap + graceful shutdown ──────────────────────────────────────
-
 const PORT = config.port;
-// 0.0.0.0 so physical phones on LAN can reach the API (not only loopback)
 const HOST = process.env.API_HOST || "0.0.0.0";
+
 const server = app.listen(PORT, HOST, () => {
   logger.info(
     { port: PORT, host: HOST, env: config.nodeEnv, corsOrigins: config.cors.origins },

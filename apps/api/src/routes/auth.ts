@@ -1,11 +1,12 @@
 import { Router, Request, Response } from "express";
-import bcrypt from "bcryptjs";
+import argon2 from "argon2";
 import { z } from "zod";
 import rateLimit from "express-rate-limit";
 import { prisma } from "../lib/prisma";
 import { config } from "../config";
 import { AuthRequest, signToken, authMiddleware } from "../middleware/auth";
 import { logger } from "../lib/logger";
+import { getRedis } from "../lib/redis-client";
 import {
   LEGAL_VERSIONS,
   evaluateConsent,
@@ -47,37 +48,34 @@ const consentLimiter = rateLimit({
   message: { error: "Too many consent updates. Try again later." },
 });
 
-const failedAttempts = new Map<string, { count: number; lockedUntil: number }>();
 const MAX_ATTEMPTS = 5;
 const LOCK_MS = 15 * 60_000;
+const FAILED_KEY_PREFIX = "login_failed:";
 
-function recordFailure(key: string) {
-  const now = Date.now();
-  const entry = failedAttempts.get(key);
-  if (!entry || entry.lockedUntil < now) {
-    failedAttempts.set(key, { count: 1, lockedUntil: 0 });
-    return;
-  }
-  entry.count += 1;
-  if (entry.count >= MAX_ATTEMPTS) {
-    entry.lockedUntil = now + LOCK_MS;
+async function recordFailure(key: string): Promise<void> {
+  const redis = await getRedis();
+  const fullKey = `${FAILED_KEY_PREFIX}${key}`;
+  const count = await redis.incr(fullKey);
+  if (count === 1) {
+    await redis.pExpire(fullKey, LOCK_MS);
   }
 }
 
-function isLocked(key: string): { locked: boolean; until: number } {
-  const entry = failedAttempts.get(key);
-  if (!entry) return { locked: false, until: 0 };
-  if (entry.lockedUntil > Date.now()) {
-    return { locked: true, until: entry.lockedUntil };
-  }
-  if (entry.lockedUntil && entry.lockedUntil <= Date.now()) {
-    failedAttempts.delete(key);
+async function isLocked(key: string): Promise<{ locked: boolean; until: number }> {
+  const redis = await getRedis();
+  const fullKey = `${FAILED_KEY_PREFIX}${key}`;
+  const count = await redis.get(fullKey);
+  if (!count) return { locked: false, until: 0 };
+  const ttl = await redis.pTTL(fullKey);
+  if (parseInt(count, 10) >= MAX_ATTEMPTS && ttl > 0) {
+    return { locked: true, until: Date.now() + ttl };
   }
   return { locked: false, until: 0 };
 }
 
-function clearFailures(key: string) {
-  failedAttempts.delete(key);
+async function clearFailures(key: string): Promise<void> {
+  const redis = await getRedis();
+  await redis.del(`${FAILED_KEY_PREFIX}${key}`);
 }
 
 const consentSelect = {
@@ -108,13 +106,14 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
   try {
     const data = loginSchema.parse(req.body);
     const lockKey = `login:${data.email}`;
-    const lock = isLocked(lockKey);
+    const lock = await isLocked(lockKey);
     if (lock.locked) {
       return res.status(429).json({
         error: "Account temporarily locked. Try again later.",
         retryAfter: Math.ceil((lock.until - Date.now()) / 1000),
       });
     }
+
     const user = await prisma.user.findUnique({
       where: { email: data.email },
       select: {
@@ -128,22 +127,28 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
         ...consentSelect,
       },
     });
+
     if (!user) {
-      recordFailure(lockKey);
+      await recordFailure(lockKey);
       return res.status(401).json({ error: "Invalid email or password" });
     }
     if (user.status !== "ACTIVE") {
       return res.status(403).json({ error: "Account not active" });
     }
-    const valid = await bcrypt.compare(data.password, user.password);
+
+    const valid = await argon2.verify(user.password, data.password);
     if (!valid) {
-      recordFailure(lockKey);
+      await recordFailure(lockKey);
       return res.status(401).json({ error: "Invalid email or password" });
     }
-    clearFailures(lockKey);
+
+    await clearFailures(lockKey);
     const consent = evaluateConsent(user);
     const token = signToken(user.id);
-    logger.info({ userId: user.id, consentComplete: consent.complete }, "user logged in");
+    logger.info(
+      { userId: user.id, consentComplete: consent.complete },
+      "user logged in",
+    );
     res.json({
       user: {
         id: user.id,
@@ -164,7 +169,6 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
   }
 });
 
-/** Return current consent status for the authenticated user */
 router.get("/consent", authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const user = await prisma.user.findUnique({
@@ -181,10 +185,6 @@ router.get("/consent", authMiddleware, async (req: AuthRequest, res: Response) =
   }
 });
 
-/**
- * Complete or refresh legal consent (DOB + terms/privacy/adult ack).
- * Used for legacy accounts and when legal document versions change.
- */
 router.post(
   "/consent",
   authMiddleware,
@@ -199,6 +199,7 @@ router.post(
       if (!existing || existing.status !== "ACTIVE") {
         return res.status(404).json({ error: "User not found" });
       }
+
       const update: Record<string, unknown> = {};
       const now = new Date();
       if (data.dateOfBirth) {
@@ -235,6 +236,7 @@ router.post(
           error: "Provide dateOfBirth and/or acceptance flags to update",
         });
       }
+
       const user = await prisma.user.update({
         where: { id: req.userId! },
         data: update,

@@ -1,0 +1,62 @@
+services:
+  - type: web
+    name: img-vdo-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_PORT
+        value: 3001
+      - key: DATABASE_URL
+        fromDatabase:
+          name: img-vdo-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: img-vdo-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: STORAGE_BACKEND
+        value: s3
+      - key: HUGGINGFACE_API_KEY
+        sync: false
+    healthCheckPath: /health
+    plan: free
+
+  - type: worker
+    name: img-vdo-worker
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: ./Dockerfile
+    dockerCommand: node apps/worker/dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: img-vdo-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: img-vdo-redis
+          property: connectionString
+      - key: HUGGINGFACE_API_KEY
+        sync: false
+    plan: free
+
+databases:
+  - name: img-vdo-db
+    plan: free
+    ipAllowList: []
+
+  - name: img-vdo-redis
+    type: redis
+    plan: free
+    ipAllowList: []
