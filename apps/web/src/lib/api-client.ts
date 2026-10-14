@@ -1,8 +1,6 @@
 /**
  * API Client for IMG-VDO Android App
- * Handles API base URL resolution for Capacitor WebView
  */
-
 const DEFAULT_API_URL = 'http://192.168.1.42:3001';
 
 function getApiBaseUrl(): string {
@@ -44,7 +42,7 @@ export interface ApiResponse<T = unknown> {
 
 export async function apiFetch<T = unknown>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
   const token = getToken();
@@ -75,25 +73,21 @@ export const authApi = {
       body: JSON.stringify({ email, password }),
     }),
 
-  logout: () =>
-    apiFetch('/api/auth/logout', { method: 'POST' }),
+  logout: () => apiFetch('/api/auth/logout', { method: 'POST' }),
 
-  getLegal: () =>
-    apiFetch('/api/auth/legal'),
+  getLegal: () => apiFetch('/api/auth/legal'),
 
-  getConsent: () =>
-    apiFetch('/api/auth/consent'),
+  getConsent: () => apiFetch('/api/auth/consent'),
 
   updateConsent: (data: {
     dateOfBirth?: string;
     acceptedTerms?: boolean;
     acceptedPrivacy?: boolean;
     acceptedAdultContent?: boolean;
-  }) =>
-    apiFetch('/api/auth/consent', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+  }) => apiFetch('/api/auth/consent', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
 };
 
 export const healthApi = {
