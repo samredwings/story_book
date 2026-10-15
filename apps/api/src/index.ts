@@ -12,6 +12,7 @@ import { requireAdultConsent } from "./middleware/adultConsent";
 import { globalRateLimiter } from "./middleware/rateLimit";
 import { logger } from "./lib/logger";
 import { prisma } from "./lib/prisma";
+import { startInlineWorker, stopInlineWorker } from "./inline-worker";
 
 import authRoutes from "./routes/auth";
 import storyboardRoutes from "./routes/storyboards";
@@ -92,6 +93,7 @@ app.get("/health", async (_req, res) => {
   const result: Record<string, string> = {
     status: "ok",
     timestamp: new Date().toISOString(),
+    worker: process.env.RUN_WORKER_INLINE === "true" ? "inline" : "external",
   };
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -166,10 +168,18 @@ const server = app.listen(PORT, HOST, () => {
   );
 });
 
+// Free single-service hosting: consume the video queue inside this process.
+if (process.env.RUN_WORKER_INLINE === "true") {
+  startInlineWorker().catch((err) => {
+    logger.error({ err }, "failed to start inline worker");
+  });
+}
+
 async function shutdown(signal: string) {
   logger.info({ signal }, "shutting down");
   server.close(async () => {
     try {
+      if (process.env.RUN_WORKER_INLINE === "true") await stopInlineWorker();
       await prisma.$disconnect();
       if (redisCheck) await redisCheck.quit();
     } catch (err) {
