@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "34b1fab2-816a-41e6-8981-1c3a2fdcee4e"
+      }
+    },
+    "android": {
+      "package": "com.sam1726.imgvdo"
+    }
+  }
+}
