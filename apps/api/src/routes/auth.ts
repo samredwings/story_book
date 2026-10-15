@@ -265,4 +265,124 @@ router.post("/logout", (_req: Request, res: Response) => {
   res.json({ success: true });
 });
 
+
+router.post("/register", async (req: Request, res: Response) => {
+  if (!config.allowRegistration) {
+    return res.status(403).json({ error: "Registration is closed" });
+  }
+
+  try {
+    const schema = z.object({
+      email: z.string().email().max(254).toLowerCase().trim(),
+      username: z.string().min(2).max(50),
+      password: z.string().min(8).max(128),
+      firstName: z.string().max(100).optional(),
+      lastName: z.string().max(100).optional(),
+    });
+
+    const data = schema.parse(req.body);
+
+    const existing = await prisma.user.findFirst({
+      where: {
+        OR: [{ email: data.email }, { username: data.username }],
+      },
+    });
+
+    if (existing) {
+      return res.status(409).json({ error: "Email or username already taken" });
+    }
+
+    const hashedPassword = await argon2.hash(data.password);
+
+    const user = await prisma.user.create({
+      data: {
+        email: data.email,
+        username: data.username,
+        password: hashedPassword,
+        firstName: data.firstName || null,
+        lastName: data.lastName || null,
+        role: "CREATOR",
+        status: "ACTIVE",
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        firstName: true,
+        lastName: true,
+        ...consentSelect,
+      },
+    });
+
+    const token = signToken(user.id);
+    const consent = evaluateConsent(user);
+
+    logger.info({ userId: user.id }, "user registered");
+    res.status(201).json({ user, token, consent });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({
+        error: "Invalid registration data",
+        details: err.flatten().fieldErrors,
+      });
+    }
+    logger.error({ err }, "registration error");
+    res.status(500).json({ error: "Registration failed" });
+  }
+});
+
+router.post("/owner-login", async (req: Request, res: Response) => {
+  if (!config.privateMode) {
+    return res.status(403).json({ error: "Private mode is disabled" });
+  }
+
+  try {
+    const { secret } = req.body as { secret?: string };
+    if (!secret || secret !== config.privateLoginSecret) {
+      return res.status(401).json({ error: "Invalid secret" });
+    }
+
+    if (!config.ownerEmail) {
+      return res.status(500).json({ error: "Owner email not configured" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: config.ownerEmail },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        firstName: true,
+        lastName: true,
+        status: true,
+        ...consentSelect,
+      },
+    });
+
+    if (!user || user.status !== "ACTIVE") {
+      return res.status(404).json({ error: "Owner account not found or inactive" });
+    }
+
+    await clearFailures(`login:${user.email}`);
+    const consent = evaluateConsent(user);
+    const token = signToken(user.id);
+
+    logger.info({ userId: user.id }, "owner auto-login");
+    res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+      token,
+      consent,
+    });
+  } catch (err) {
+    logger.error({ err }, "owner login error");
+    res.status(500).json({ error: "Owner login failed" });
+  }
+});
+
 export default router;

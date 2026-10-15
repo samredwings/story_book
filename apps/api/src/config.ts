@@ -125,4 +125,10 @@ export const config = {
     colabEndpoint: parsed.data.COLAB_ENDPOINT,
   },
   isProduction: parsed.data.NODE_ENV === "production",
+ allowRegistration: parsed.data.ALLOW_REGISTRATION,
+ privateMode: parsed.data.PRIVATE_MODE,
+ ownerEmail: parsed.data.OWNER_EMAIL,
+ ownerPassword: parsed.data.OWNER_PASSWORD,
+ ownerUsername: parsed.data.OWNER_USERNAME,
+ privateLoginSecret: parsed.data.PRIVATE_LOGIN_SECRET,
 };

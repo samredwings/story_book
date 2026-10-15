@@ -1,40 +1,36 @@
 import { PrismaClient } from '@prisma/client';
-import bcryptjs from 'bcryptjs';
+import argon2 from 'argon2';
 
 const prisma = new PrismaClient();
 
 async function main() {
   try {
-    // Clean up existing data
-    await prisma.sceneCharacter.deleteMany();
-    await prisma.generationJob.deleteMany();
-    await prisma.scene.deleteMany();
-    await prisma.story.deleteMany();
-    await prisma.storyboard.deleteMany();
-    await prisma.character.deleteMany();
-    await prisma.auditLog.deleteMany();
-    await prisma.apiKey.deleteMany();
-    await prisma.user.deleteMany();
+    const ownerEmail = process.env.OWNER_EMAIL || 'owner@local';
+    const ownerPassword = process.env.OWNER_PASSWORD || 'changeme-owner-123';
+    const ownerUsername = process.env.OWNER_USERNAME || 'owner';
 
-    // Create demo user
-    const hashedPassword = await bcryptjs.hash('password123', 10);
-    const demoUser = await prisma.user.create({
-      data: {
-        email: 'demo@storybook.io',
-        username: 'demo',
+    const hashedPassword = await argon2.hash(ownerPassword);
+
+    await prisma.user.upsert({
+      where: { email: ownerEmail },
+      update: {
         password: hashedPassword,
-        firstName: 'Demo',
-        lastName: 'User',
-        role: 'CREATOR',
+        status: 'ACTIVE',
+        role: 'ADMIN',
+      },
+      create: {
+        email: ownerEmail,
+        username: ownerUsername,
+        password: hashedPassword,
+        firstName: 'Owner',
+        lastName: 'Account',
+        role: 'ADMIN',
+        status: 'ACTIVE',
       },
     });
 
-    console.log('✅ Database seeded successfully');
-    console.log('Demo user created:', {
-      email: demoUser.email,
-      username: demoUser.username,
-      password: 'password123',
-    });
+    console.log('✅ Owner user ready:', { email: ownerEmail, username: ownerUsername });
+    console.log('   Set OWNER_PASSWORD on Render and re-run seed to rotate password.');
   } catch (error) {
     console.error('❌ Error seeding database:', error);
     process.exit(1);
