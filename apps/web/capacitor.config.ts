@@ -1,7 +1,7 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.imgvdo.app',
+  appId: 'com.storybook.studio',
   appName: 'IMG-VDO Storybook',
   webDir: 'dist',
   server: {

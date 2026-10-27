@@ -11,6 +11,9 @@ const CAPACITOR_ORIGINS = [
   "ionic://localhost",
 ] as const;
 
+const booleanFromEnv = (defaultValue: "true" | "false") =>
+  z.enum(["true", "false"]).default(defaultValue).transform((value) => value === "true");
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   API_PORT: z.coerce.number().default(3001),
@@ -50,6 +53,12 @@ const envSchema = z.object({
   REQUIRE_AGE_VERIFICATION: z.coerce.boolean().default(true),
   MIN_AGE: z.coerce.number().default(18),
   ENCRYPTION_KEY: z.string().min(16).optional(),
+  ALLOW_REGISTRATION: booleanFromEnv("false"),
+  PRIVATE_MODE: booleanFromEnv("false"),
+  OWNER_EMAIL: z.string().optional(),
+  OWNER_PASSWORD: z.string().optional(),
+  OWNER_USERNAME: z.string().optional(),
+  PRIVATE_LOGIN_SECRET: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -125,10 +134,10 @@ export const config = {
     colabEndpoint: parsed.data.COLAB_ENDPOINT,
   },
   isProduction: parsed.data.NODE_ENV === "production",
- allowRegistration: parsed.data.ALLOW_REGISTRATION,
- privateMode: parsed.data.PRIVATE_MODE,
- ownerEmail: parsed.data.OWNER_EMAIL,
- ownerPassword: parsed.data.OWNER_PASSWORD,
- ownerUsername: parsed.data.OWNER_USERNAME,
- privateLoginSecret: parsed.data.PRIVATE_LOGIN_SECRET,
+  allowRegistration: parsed.data.ALLOW_REGISTRATION,
+  privateMode: parsed.data.PRIVATE_MODE,
+  ownerEmail: parsed.data.OWNER_EMAIL,
+  ownerPassword: parsed.data.OWNER_PASSWORD,
+  ownerUsername: parsed.data.OWNER_USERNAME,
+  privateLoginSecret: parsed.data.PRIVATE_LOGIN_SECRET,
 };

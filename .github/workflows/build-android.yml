@@ -3,7 +3,11 @@ name: Build Android APK
 on:
   push:
     branches: [main, master]
+    tags: ['v*']
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -31,9 +35,7 @@ jobs:
           java-version: '17'
 
       - name: Install dependencies
-        run: |
-          rm -rf node_modules apps/*/node_modules packages/*/node_modules package-lock.json
-          npm install
+        run: npm install --no-audit --no-fund
 
       - name: Generate Prisma client
         run: npx prisma generate --schema=apps/api/prisma/schema.prisma
@@ -67,3 +69,10 @@ jobs:
         with:
           name: img-vdo-debug-apk
           path: apps/web/android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: apps/web/android/app/build/outputs/apk/debug/app-debug.apk
