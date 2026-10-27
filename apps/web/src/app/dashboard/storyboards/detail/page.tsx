@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
 import Link from "next/link";
 import { authHeaders, getApiBase, getToken } from "../../../../lib/auth";
+import { DEBUG_MODE } from "../../../../lib/debug-mode";
 
 function DetailInner() {
   const router = useRouter();
@@ -21,7 +22,7 @@ function DetailInner() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!getToken()) {
+    if (!DEBUG_MODE && !getToken()) {
       router.replace("/login");
       return;
     }

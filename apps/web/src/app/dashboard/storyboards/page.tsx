@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import axios from "axios";
 import { authHeaders, getApiBase, getToken } from "../../../lib/auth";
+import { DEBUG_MODE } from "../../../lib/debug-mode";
 import { useRouter } from "next/navigation";
 
 type Storyboard = {
@@ -21,7 +22,7 @@ export default function StoryboardsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!getToken()) {
+    if (!DEBUG_MODE && !getToken()) {
       router.replace("/login");
       return;
     }

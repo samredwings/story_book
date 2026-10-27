@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { authHeaders, clearSession, getApiBase, getToken } from "../../lib/auth";
+import { DEBUG_MODE } from "../../lib/debug-mode";
 
 export default function ConsentPage() {
   const router = useRouter();
@@ -16,6 +17,7 @@ export default function ConsentPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (DEBUG_MODE) return;
     if (!getToken()) {
       router.replace("/login");
       return;

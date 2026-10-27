@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { authHeaders, getApiBase, getToken } from "../../../../lib/auth";
+import { DEBUG_MODE } from "../../../../lib/debug-mode";
 import Link from "next/link";
 
 export default function NewStoryboardPage() {
@@ -15,7 +16,7 @@ export default function NewStoryboardPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!getToken()) {
+    if (!DEBUG_MODE && !getToken()) {
       router.replace("/login");
       return;
     }

@@ -1,3 +1,4 @@
+import { getApiBase } from "./auth";
 export async function generateStory({
   prompt,
   genre,
@@ -10,7 +11,7 @@ export async function generateStory({
   modelId: string;
 }) {
   const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/api/stories/generate-uncensored`,
+    `${getApiBase()}/api/stories/generate-uncensored`,
     {
       method: 'POST',
       headers: {
@@ -34,7 +35,7 @@ export async function generateStory({
 }
 
 export async function generateVideoFromScene(sceneId: string, imageUrl: string, prompt: string) {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/videos/generate`, {
+  const response = await fetch(`${getApiBase()}/api/videos/generate`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -61,7 +62,7 @@ export async function enhanceStory({
   storyId: string;
   aspect: string;
 }) {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/creative/enhance`, {
+  const response = await fetch(`${getApiBase()}/api/creative/enhance`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

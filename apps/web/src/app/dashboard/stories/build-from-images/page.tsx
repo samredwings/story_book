@@ -1,4 +1,5 @@
 "use client";
+import { getApiBase } from '../../../../lib/auth';
 
 import { useState, useRef, useEffect } from "react";
 import axios from "axios";
@@ -110,7 +111,7 @@ export default function BuildStoryFromImages() {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/media-assets`,
+        `${getApiBase()}/api/media-assets`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -149,7 +150,7 @@ export default function BuildStoryFromImages() {
 
         // Save to backend
         const response = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/media-assets`,
+          `${getApiBase()}/api/media-assets`,
           {
             url: dataUri,
             assetType: file.type.startsWith("video") ? "VIDEO" : "IMAGE",
@@ -239,7 +240,7 @@ export default function BuildStoryFromImages() {
 
       // Use the streaming endpoint for progress
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/stories/build-from-images`,
+        `${getApiBase()}/api/stories/build-from-images`,
         {
           method: "POST",
           headers: {

@@ -1,4 +1,5 @@
 "use client";
+import { getApiBase } from '../../../../lib/auth';
 
 import { useState } from "react";
 import axios from "axios";
@@ -41,7 +42,7 @@ export default function CreateStory() {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/stories/generate`,
+        `${getApiBase()}/api/stories/generate`,
         formData,
         {
           headers: {

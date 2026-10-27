@@ -4,6 +4,8 @@ import { ReactNode, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getToken } from "../lib/auth";
 import { initPrivateMode } from "../lib/session";
+import { DEBUG_MODE } from "../lib/debug-mode";
+import { DebugTools } from "../components/debug-tools";
 
 export function Providers({ children }: { children: ReactNode }) {
   const [checking, setChecking] = useState(true);
@@ -12,6 +14,11 @@ export function Providers({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     async function checkAuth() {
+      if (DEBUG_MODE) {
+        setChecking(false);
+        return;
+      }
+
       const publicPaths = ["/login", "/consent"];
       const token = getToken();
 
@@ -50,5 +57,8 @@ export function Providers({ children }: { children: ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return <>
+    {children}
+    <DebugTools />
+  </>;
 }

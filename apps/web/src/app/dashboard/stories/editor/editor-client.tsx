@@ -1,4 +1,5 @@
 "use client";
+import { getApiBase } from '../../../../lib/auth';
 
 import { useState, useEffect } from "react";
 import axios from "axios";
@@ -65,7 +66,7 @@ export default function StoryEditor() {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/stories/${storyId}`,
+        `${getApiBase()}/api/stories/${storyId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -90,7 +91,7 @@ export default function StoryEditor() {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/media-assets?storyId=${storyId}`,
+        `${getApiBase()}/api/media-assets?storyId=${storyId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -107,7 +108,7 @@ export default function StoryEditor() {
     try {
       const token = localStorage.getItem("token");
       await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/stories/${storyId}`,
+        `${getApiBase()}/api/stories/${storyId}`,
         { content },
         {
           headers: {
@@ -138,7 +139,7 @@ export default function StoryEditor() {
     try {
       // Send to roleplay AI endpoint with optional image generation
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/roleplay/respond`,
+        `${getApiBase()}/api/roleplay/respond`,
         {
           storyId,
           message: messageText,
@@ -174,7 +175,7 @@ export default function StoryEditor() {
 
       // Generate image via roleplay with the scene description as context
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/roleplay/respond`,
+        `${getApiBase()}/api/roleplay/respond`,
         {
           storyId,
           message: `Generate a visual scene: ${scene.title}`,
@@ -201,7 +202,7 @@ export default function StoryEditor() {
       return urlOrId;
     }
     // If it's an API path, use the full URL
-    return `${process.env.NEXT_PUBLIC_API_URL}${urlOrId}`;
+    return `${getApiBase()}${urlOrId}`;
   };
 
   if (loading) {
@@ -405,7 +406,7 @@ export default function StoryEditor() {
                                 asset.url.startsWith("data:") ||
                                 asset.url.startsWith("http")
                                   ? asset.url
-                                  : `${process.env.NEXT_PUBLIC_API_URL}/api/media-assets/${asset.id}/download`
+                                  : `${getApiBase()}/api/media-assets/${asset.id}/download`
                               }
                               download
                               className="text-xs text-purple-300 hover:text-purple-200"

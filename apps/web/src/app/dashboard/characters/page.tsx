@@ -1,4 +1,5 @@
 "use client";
+import { getApiBase } from '../../../lib/auth';
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -33,7 +34,7 @@ export default function CharactersPage() {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/characters`,
+        `${getApiBase()}/api/characters`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -50,7 +51,7 @@ export default function CharactersPage() {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/characters/${id}`,
+        `${getApiBase()}/api/characters/${id}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },

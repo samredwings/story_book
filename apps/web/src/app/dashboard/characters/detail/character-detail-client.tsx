@@ -1,4 +1,5 @@
 "use client";
+import { getApiBase } from '../../../../lib/auth';
 
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -50,7 +51,7 @@ export default function CharacterDetailPage() {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/characters/${characterId}`,
+        `${getApiBase()}/api/characters/${characterId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -103,7 +104,7 @@ export default function CharacterDetailPage() {
       form.append("description", `Character image for ${name}`);
 
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/media-assets`,
+        `${getApiBase()}/api/media-assets`,
         form,
         {
           headers: {
@@ -155,7 +156,7 @@ export default function CharacterDetailPage() {
         .filter(Boolean);
 
       await axios.put(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/characters/${characterId}`,
+        `${getApiBase()}/api/characters/${characterId}`,
         {
           name: name.trim(),
           description: description.trim() || undefined,
@@ -188,7 +189,7 @@ export default function CharacterDetailPage() {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/characters/${characterId}`,
+        `${getApiBase()}/api/characters/${characterId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },

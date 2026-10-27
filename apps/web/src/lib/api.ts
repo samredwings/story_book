@@ -1,23 +1,16 @@
 /**
  * API Client for IMG-VDO Android App
  */
-const DEFAULT_API_URL = "http://192.168.1.42:3001";
+import { getApiBase, setApiBase } from "./auth";
 
 function getApiBaseUrl(): string {
-  if (typeof window !== "undefined") {
-    const stored = localStorage.getItem("api_base_url");
-    if (stored) return stored;
-  }
-  if (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
-  }
-  return DEFAULT_API_URL;
+  return getApiBase();
 }
 
 export const API_BASE_URL = getApiBaseUrl();
 
 export function setApiBaseUrl(url: string): void {
-  localStorage.setItem("api_base_url", url);
+  setApiBase(url);
 }
 
 export function getToken(): string | null {
@@ -44,7 +37,7 @@ export async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const url = `${API_BASE_URL}${path}`;
+  const url = `${getApiBaseUrl()}${path}`;
   const token = getToken();
 
   const headers: Record<string, string> = {

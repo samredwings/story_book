@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { getApiBase, getToken, setSession } from "../../lib/auth";
+import { DEBUG_MODE } from "../../lib/debug-mode";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -53,6 +54,18 @@ export default function LoginPage() {
         <p className="mt-2 text-sm text-zinc-400">
           Storybook Studio — adult content, 18+ only
         </p>
+        {DEBUG_MODE && (
+          <div className="mt-5 rounded-lg border border-amber-300/40 bg-amber-300/10 p-3">
+            <p className="text-sm text-amber-100">Debug build: sign-in is skipped on this device.</p>
+            <button
+              type="button"
+              onClick={() => router.replace("/dashboard")}
+              className="mt-3 w-full rounded-lg bg-amber-500 py-2.5 font-medium text-black"
+            >
+              Open app without signing in
+            </button>
+          </div>
+        )}
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
           <div>
             <label className="block text-sm text-zinc-400 mb-1">Email</label>

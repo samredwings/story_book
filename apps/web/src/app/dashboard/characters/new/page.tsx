@@ -1,4 +1,5 @@
 "use client";
+import { getApiBase } from '../../../../lib/auth';
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -45,7 +46,7 @@ export default function NewCharacterPage() {
       });
 
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/media-assets`,
+        `${getApiBase()}/api/media-assets`,
         {
           url: base64,
           assetType: "IMAGE",
@@ -100,7 +101,7 @@ export default function NewCharacterPage() {
         .filter(Boolean);
 
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/characters`,
+        `${getApiBase()}/api/characters`,
         {
           name: name.trim(),
           description: description.trim() || undefined,

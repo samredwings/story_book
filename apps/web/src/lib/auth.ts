@@ -2,6 +2,7 @@
 
 const TOKEN_KEY = "token";
 const USER_KEY = "user";
+const API_BASE_KEY = "storybook.api_base_url";
 
 export type ConsentStatus = {
   complete: boolean;
@@ -19,17 +20,28 @@ export type AuthUser = {
 };
 
 /**
- * Single source of truth for API base URL (inlined at Next static-export build).
- * Always set NEXT_PUBLIC_API_URL in .env.production before `npm run android:apk`.
- * Never rely on localhost inside an APK — that is the phone itself.
+ * Single source of truth for the API base URL. Debug builds can set it on-device;
+ * regular builds use the build-time environment variable. Never default to
+ * localhost inside an APK — that is the phone itself.
  */
 export function getApiBase(): string {
+  if (typeof window !== "undefined") {
+    const saved = window.localStorage.getItem(API_BASE_KEY)?.trim();
+    if (saved) return saved.replace(/\/$/, "");
+  }
   const raw = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (raw) {
     return raw.replace(/\/$/, "");
   }
-  // Dev-only fallback (browser on same machine)
-  return "http://localhost:3001";
+  return "";
+}
+
+export function setApiBase(url: string): void {
+  if (typeof window === "undefined") return;
+  const normalized = url.trim().replace(/\/$/, "");
+  if (normalized) window.localStorage.setItem(API_BASE_KEY, normalized);
+  else window.localStorage.removeItem(API_BASE_KEY);
+  window.dispatchEvent(new Event("storybook-api-base-changed"));
 }
 
 export function getToken(): string | null {
