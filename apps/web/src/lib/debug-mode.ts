@@ -12,7 +12,7 @@ export type DebugEvent = {
   details?: string;
 };
 
-function redact(value: string): string {
+export function redactDebugText(value: string): string {
   return value
     .replace(/Bearer\s+[^\s"']+/gi, "Bearer [redacted]")
     .replace(/((?:password|secret|token)["'\s:=]+)[^\s,"']+/gi, "$1[redacted]");
@@ -37,9 +37,9 @@ export function recordDebugEvent(
   if (!DEBUG_MODE || typeof window === "undefined") return;
   const event: DebugEvent = {
     time: new Date().toISOString(),
-    kind: redact(kind).slice(0, 40),
-    message: redact(message).slice(0, 2000),
-    details: details ? redact(details).slice(0, 6000) : undefined,
+    kind: redactDebugText(kind).slice(0, 40),
+    message: redactDebugText(message).slice(0, 2000),
+    details: details ? redactDebugText(details).slice(0, 6000) : undefined,
   };
   const events = [...getDebugEvents(), event].slice(-MAX_EVENTS);
   try {
@@ -95,8 +95,17 @@ export function installDebugCapture(): void {
 
   const originalFetch = window.fetch.bind(window);
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-    const method = init?.method || (input instanceof Request ? input.method : "GET");
+    let url: string;
+    let requestMethod = "GET";
+    if (typeof input === "string") {
+      url = input;
+    } else if ("url" in input) {
+      url = input.url;
+      requestMethod = input.method;
+    } else {
+      url = input.href;
+    }
+    const method = init?.method || requestMethod;
     try {
       const response = await originalFetch(input, init);
       if (!response.ok) {

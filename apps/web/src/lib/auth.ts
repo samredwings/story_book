@@ -26,8 +26,12 @@ export type AuthUser = {
  */
 export function getApiBase(): string {
   if (typeof window !== "undefined") {
-    const saved = window.localStorage.getItem(API_BASE_KEY)?.trim();
-    if (saved) return saved.replace(/\/$/, "");
+    try {
+      const saved = window.localStorage.getItem(API_BASE_KEY)?.trim();
+      if (saved) return saved.replace(/\/$/, "");
+    } catch {
+      // Storage can be unavailable in restricted WebViews; keep the app usable.
+    }
   }
   const raw = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (raw) {

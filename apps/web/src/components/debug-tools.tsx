@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
 import { getApiBase, setApiBase } from "../lib/auth";
 import {
   DEBUG_MODE,
@@ -21,7 +20,6 @@ function safeBaseUrl(value: string): string {
 }
 
 export function DebugTools() {
-  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [events, setEvents] = useState<DebugEvent[]>([]);
   const [apiUrl, setApiUrl] = useState("");
@@ -30,9 +28,17 @@ export function DebugTools() {
 
   useEffect(() => {
     if (!DEBUG_MODE) return;
-    installDebugCapture();
-    setEvents(getDebugEvents());
-    setApiUrl(getApiBase());
+    try {
+      installDebugCapture();
+      setEvents(getDebugEvents());
+      setApiUrl(getApiBase());
+    } catch (error) {
+      recordDebugEvent(
+        "debug-tools",
+        error instanceof Error ? error.message : String(error),
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
     const refresh = () => setEvents(getDebugEvents());
     const refreshApiUrl = () => setApiUrl(getApiBase());
     window.addEventListener("storybook-debug-events-changed", refresh);
@@ -100,7 +106,7 @@ export function DebugTools() {
       {
         app: "Storybook Studio debug build",
         capturedAt: new Date().toISOString(),
-        route: pathname,
+        route: window.location.pathname,
         apiBase: safeBaseUrl(getApiBase()),
         userAgent: navigator.userAgent,
         events: getDebugEvents(),
