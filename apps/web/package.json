@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node scripts/patch-next-router-cache.js",
+    "prebuild": "node scripts/patch-next-router-cache.js || echo 'router-cache patch skipped'",
     "build": "NODE_OPTIONS=--max-old-space-size=4096 next build",
     "start": "next start",
     "cap:add": "cap add android",
