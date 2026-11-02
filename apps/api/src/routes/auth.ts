@@ -384,5 +384,52 @@ router.post("/owner-login", async (req: Request, res: Response) => {
     res.status(500).json({ error: "Owner login failed" });
   }
 });
+router.post("/register", async (_req: Request, res: Response) => {
+  return res.status(403).json({ error: "Registration is disabled" });
+});
 
+router.post("/owner-login", async (req: Request, res: Response) => {
+  if (!config.privateMode) {
+    return res.status(403).json({ error: "Private mode is disabled" });
+  }
+
+  const { secret } = req.body as { secret?: string };
+  if (!secret || secret !== config.privateLoginSecret) {
+    return res.status(401).json({ error: "Invalid login secret" });
+  }
+
+  const ownerEmail = config.ownerEmail || "owner@local";
+  const user = await prisma.user.findUnique({
+    where: { email: ownerEmail },
+    select: {
+      id: true,
+      email: true,
+      username: true,
+      firstName: true,
+      lastName: true,
+      status: true,
+      ...consentSelect,
+    },
+  });
+
+  if (!user || user.status !== "ACTIVE") {
+    return res.status(404).json({ error: "Owner account not found" });
+  }
+
+  const consent = evaluateConsent(user);
+  const token = signToken(user.id);
+  logger.info({ userId: user.id }, "Silent owner login completed");
+
+  return res.json({
+    user: {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
+    },
+    token,
+    consent,
+  });
+});
 export default router;
