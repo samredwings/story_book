@@ -38,7 +38,7 @@ const generateVideoSchema = z.object({
 
 // ─── POST /api/videos ────────────────────────────────────────────────────────
 
-router.post("/", async (req: AuthRequest, res: Response) => {
+router.post(["/", "/generate"], async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const data = generateVideoSchema.parse(req.body);
@@ -123,7 +123,8 @@ router.get("/job/:jobId", async (req: AuthRequest, res: Response) => {
       include: { scenes: true },
     });
 
-    if (!job) {
+    // A valid session is not sufficient: generation jobs are private to their owner.
+    if (!job || job.userId !== req.userId) {
       return res.status(404).json({ error: "Job not found" });
     }
 
