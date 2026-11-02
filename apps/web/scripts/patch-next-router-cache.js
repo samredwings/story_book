@@ -19,14 +19,22 @@ if (!fs.existsSync(appRenderPath)) {
 }
 
 const source = fs.readFileSync(appRenderPath, "utf8");
-const nullInitialRoutes = /initialParallelRoutes\s*:\s*null\s*,/g;
+const nullInitialRoutes = /initialParallelRoutes\s*:\s*null\s*,?/g;
 const matches = source.match(nullInitialRoutes) || [];
 
-if (matches.length < 2) {
+if (matches.length === 0) {
+  const alreadyPatched =
+    /initialParallelRoutes\s*:\s*new Map\(\)\s*,?/.test(source);
+
+  if (alreadyPatched) {
+    console.log("Next.js App Router cache fix is already applied.");
+    process.exit(0);
+  }
+
   throw new Error(
-    "Expected at least 2 Next.js initialParallelRoutes null values, found " +
-      matches.length +
-      ". Refusing to build without the App Router fix.",
+    "Could not find an unpatched initialParallelRoutes value in " +
+      appRenderPath +
+      ". The installed Next.js source may have changed; inspect this file before building.",
   );
 }
 
@@ -34,9 +42,10 @@ const patched = source.replace(
   nullInitialRoutes,
   "initialParallelRoutes: new Map(),",
 );
+
 fs.writeFileSync(appRenderPath, patched, "utf8");
 console.log(
   "Applied Next.js App Router cache initialization fix (" +
     matches.length +
-    " call sites).",
+    " call site(s)).",
 );
