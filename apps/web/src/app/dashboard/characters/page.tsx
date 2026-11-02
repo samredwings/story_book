@@ -29,19 +29,46 @@ export default function CharactersPage() {
     fetchCharacters();
   }, []);
 
-  const fetchCharacters = async () => {
+    const fetchCharacters = async () => {
     setLoading(true);
+    setError(null);
+
     try {
+      const apiBase = getApiBase().replace(/\/$/, "");
+      if (!apiBase) {
+        throw new Error("API URL is empty. Check NEXT_PUBLIC_API_URL.");
+      }
+
       const token = localStorage.getItem("token");
-      const response = await axios.get(
-        `${getApiBase()}/api/characters`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      setCharacters(response.data);
+      const response = await axios.get(`${apiBase}/api/characters`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      let payload: unknown = response.data;
+
+      // Accept either a plain array or a common API wrapper shape.
+      if (!Array.isArray(payload) && payload && typeof payload === "object") {
+        const body = payload as Record<string, unknown>;
+        payload = Array.isArray(body.characters) ? body.characters : body.data;
+      }
+
+      if (!Array.isArray(payload)) {
+        console.error("Unexpected /api/characters response:", response.data);
+        setCharacters([]);
+        setError(
+          "The API did not return a character list. Check the API URL and server response.",
+        );
+        return;
+      }
+
+      setCharacters(payload as Character[]);
     } catch (err: any) {
-      setError(err.response?.data?.error || "Failed to fetch characters");
+      setCharacters([]);
+      setError(
+        err.response?.data?.error ||
+          err.message ||
+          "Failed to fetch characters",
+      );
     } finally {
       setLoading(false);
     }
