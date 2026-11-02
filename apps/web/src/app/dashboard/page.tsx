@@ -6,22 +6,26 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { getApiBase } from "../../lib/auth";
 
-interface DashboardStats {
-  stats: {
-    storyboards: number;
-    stories: number;
-    characters: number;
-    totalScenes: number;
+interface DashboardData {
+  counts?: {
+    stories?: number;
+    characters?: number;
+    storyboards?: number;
+    jobs?: number;
   };
-  recentStories: any[];
-  recentStoryboards: any[];
+  stats?: {
+    stories?: number;
+    characters?: number;
+    storyboards?: number;
+    totalScenes?: number;
+  };
+  recentJobs?: any[];
+  recentStories?: any[];
 }
 
 export default function Dashboard() {
   const router = useRouter();
-  const [dashboardData, setDashboardData] = useState<DashboardStats | null>(
-    null,
-  );
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,12 +35,17 @@ export default function Dashboard() {
   const fetchDashboard = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.get(`${getApiBase()}/api/dashboard`, {
+      const apiBase = getApiBase();
+      if (!apiBase) {
+        setLoading(false);
+        return;
+      }
+      const response = await axios.get(`${apiBase}/api/dashboard`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      setDashboardData(response.data);
+      setDashboardData(response.data || {});
     } catch (error) {
       console.error("Failed to fetch dashboard:", error);
     } finally {
@@ -51,6 +60,27 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  const storyboards =
+    dashboardData?.counts?.storyboards ??
+    dashboardData?.stats?.storyboards ??
+    0;
+  const stories =
+    dashboardData?.counts?.stories ??
+    dashboardData?.stats?.stories ??
+    0;
+  const characters =
+    dashboardData?.counts?.characters ??
+    dashboardData?.stats?.characters ??
+    0;
+  const totalJobsOrScenes =
+    dashboardData?.counts?.jobs ??
+    dashboardData?.stats?.totalScenes ??
+    0;
+
+  const recentStories = Array.isArray(dashboardData?.recentStories)
+    ? dashboardData.recentStories
+    : [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-black">
@@ -104,27 +134,19 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-gradient-to-br from-purple-600 to-purple-900 p-6 rounded-lg">
             <p className="text-purple-200 text-sm mb-2">Storyboards</p>
-            <p className="text-4xl font-bold text-white">
-              {dashboardData?.stats.storyboards || 0}
-            </p>
+            <p className="text-4xl font-bold text-white">{storyboards}</p>
           </div>
           <div className="bg-gradient-to-br from-pink-600 to-pink-900 p-6 rounded-lg">
             <p className="text-pink-200 text-sm mb-2">Stories</p>
-            <p className="text-4xl font-bold text-white">
-              {dashboardData?.stats.stories || 0}
-            </p>
+            <p className="text-4xl font-bold text-white">{stories}</p>
           </div>
           <div className="bg-gradient-to-br from-blue-600 to-blue-900 p-6 rounded-lg">
             <p className="text-blue-200 text-sm mb-2">Characters</p>
-            <p className="text-4xl font-bold text-white">
-              {dashboardData?.stats.characters || 0}
-            </p>
+            <p className="text-4xl font-bold text-white">{characters}</p>
           </div>
           <div className="bg-gradient-to-br from-green-600 to-green-900 p-6 rounded-lg">
-            <p className="text-green-200 text-sm mb-2">Total Scenes</p>
-            <p className="text-4xl font-bold text-white">
-              {dashboardData?.stats.totalScenes || 0}
-            </p>
+            <p className="text-green-200 text-sm mb-2">Generation Jobs</p>
+            <p className="text-4xl font-bold text-white">{totalJobsOrScenes}</p>
           </div>
         </div>
 
@@ -167,28 +189,27 @@ export default function Dashboard() {
           </Link>
         </div>
 
-        {dashboardData?.recentStories &&
-          dashboardData.recentStories.length > 0 && (
-            <div className="bg-gray-800/50 backdrop-blur border border-purple-500/20 rounded-lg p-6 mb-8">
-              <h2 className="text-xl font-bold text-white mb-4">
-                Recent Stories
-              </h2>
-              <div className="space-y-2">
-                {dashboardData.recentStories.map((story) => (
-                  <Link
-                    key={story.id}
-                    href={`/dashboard/stories/editor?id=${story.id}`}
-                    className="block p-3 bg-purple-600/20 hover:bg-purple-600/40 rounded border border-purple-500/20 text-white transition min-h-[44px]"
-                  >
-                    <p className="font-semibold">{story.title}</p>
-                    <p className="text-sm text-gray-300">
-                      Genre: {story.genre}
-                    </p>
-                  </Link>
-                ))}
-              </div>
+        {recentStories.length > 0 && (
+          <div className="bg-gray-800/50 backdrop-blur border border-purple-500/20 rounded-lg p-6 mb-8">
+            <h2 className="text-xl font-bold text-white mb-4">
+              Recent Stories
+            </h2>
+            <div className="space-y-2">
+              {recentStories.map((story) => (
+                <Link
+                  key={story.id}
+                  href={`/dashboard/stories/editor?id=${story.id}`}
+                  className="block p-3 bg-purple-600/20 hover:bg-purple-600/40 rounded border border-purple-500/20 text-white transition min-h-[44px]"
+                >
+                  <p className="font-semibold">{story.title}</p>
+                  <p className="text-sm text-gray-300">
+                    Genre: {story.genre}
+                  </p>
+                </Link>
+              ))}
             </div>
-          )}
+          </div>
+        )}
       </div>
     </div>
   );
