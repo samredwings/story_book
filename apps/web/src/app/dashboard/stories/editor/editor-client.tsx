@@ -73,9 +73,10 @@ export default function StoryEditor() {
           },
         },
       );
-      setStory(response.data);
-      setContent(response.data.content);
-      setScenes(response.data.scenes || []);
+      const storyData = response.data || {};
+      setStory(storyData);
+      setContent(storyData.content || "");
+      setScenes(Array.isArray(storyData.scenes) ? storyData.scenes : []);
 
       // Also fetch media assets linked to this story
       fetchMediaAssets();
@@ -96,7 +97,7 @@ export default function StoryEditor() {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
-      setMediaAssets(response.data);
+      setMediaAssets(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error("Failed to fetch media assets:", error);
     } finally {
@@ -198,7 +199,7 @@ export default function StoryEditor() {
 
   const getDisplayUrl = (urlOrId: string): string => {
     // If it's a data URI, use it directly
-    if (urlOrId.startsWith("data:") || urlOrId.startsWith("http")) {
+    if (urlOrId?.startsWith("data:") || urlOrId?.startsWith("http")) {
       return urlOrId;
     }
     // If it's an API path, use the full URL
@@ -259,7 +260,7 @@ export default function StoryEditor() {
         {activeTab === "content" && (
           <div className="bg-gray-800/50 backdrop-blur border border-purple-500/20 rounded-lg p-6">
             <ReactQuill
-              theme="dark"
+              theme="snow"
               value={content}
               onChange={setContent}
               modules={{
@@ -381,8 +382,8 @@ export default function StoryEditor() {
                       key={asset.id}
                       className="group relative bg-gray-700/30 rounded-lg overflow-hidden border border-purple-500/10 hover:border-purple-400/30 transition"
                     >
-                      {asset.url.startsWith("data:") ||
-                      asset.url.startsWith("http") ? (
+                      {asset.url?.startsWith("data:") ||
+                      asset.url?.startsWith("http") ? (
                         <div className="aspect-square overflow-hidden">
                           <img
                             src={getDisplayUrl(asset.url)}
@@ -403,8 +404,8 @@ export default function StoryEditor() {
                           <div className="flex gap-2 mt-1">
                             <a
                               href={
-                                asset.url.startsWith("data:") ||
-                                asset.url.startsWith("http")
+                                asset.url?.startsWith("data:") ||
+                                asset.url?.startsWith("http")
                                   ? asset.url
                                   : `${getApiBase()}/api/media-assets/${asset.id}/download`
                               }
@@ -462,7 +463,7 @@ export default function StoryEditor() {
             </div>
 
             <div className="h-96 overflow-y-auto mb-4 bg-black/30 rounded p-4 space-y-4">
-              {chatMessages.map((msg, idx) => (
+              {Array.isArray(chatMessages) && chatMessages.map((msg, idx) => (
                 <div key={idx}>
                   <div
                     className={`flex ${

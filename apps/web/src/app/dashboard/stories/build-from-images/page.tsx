@@ -116,7 +116,8 @@ export default function BuildStoryFromImages() {
           headers: { Authorization: `Bearer ${token}` },
         },
       );
-      const unstoried = response.data.filter((a: MediaAsset) => !a.storyId);
+      const payload = Array.isArray(response.data) ? response.data : [];
+      const unstoried = payload.filter((a: MediaAsset) => !a.storyId);
       if (unstoried.length > 0) {
         setAssets(unstoried);
       }
@@ -184,7 +185,8 @@ export default function BuildStoryFromImages() {
       const reader = new FileReader();
       reader.onload = () => {
         const result = reader.result as string;
-        resolve(result.split(",")[1]);
+        const parts = String(result).split(",");
+          resolve(parts.length > 1 ? parts[1] : "");
       };
       reader.onerror = reject;
       reader.readAsDataURL(file);
@@ -291,7 +293,7 @@ export default function BuildStoryFromImages() {
 
         for (const line of lines) {
           try {
-            const data = JSON.parse(line);
+            let data; try { data = JSON.parse(line); } catch { continue; }
             if (data.type === "progress") {
               setProgress(data);
             } else if (data.type === "complete") {
@@ -421,8 +423,8 @@ export default function BuildStoryFromImages() {
 
                       {/* Image Preview */}
                       <div className="aspect-video bg-gray-800 relative overflow-hidden">
-                        {asset.url.startsWith("data:") ||
-                        asset.url.startsWith("http") ? (
+                        {asset.url?.startsWith("data:") ||
+                        asset.url?.startsWith("http") ? (
                           <Image
                             src={asset.url}
                             alt={asset.label || `Scene ${idx + 1}`}
