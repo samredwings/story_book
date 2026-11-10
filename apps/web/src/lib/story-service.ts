@@ -1,17 +1,17 @@
 import { getApiBase } from "./auth";
 export async function generateStory({
+  title,
   prompt,
   genre,
   contentRating,
-  modelId,
 }: {
+  title: string;
   prompt: string;
   genre: string;
   contentRating: string;
-  modelId: string;
 }) {
   const response = await fetch(
-    `${getApiBase()}/api/stories/generate-uncensored`,
+    `${getApiBase()}/api/stories/generate`,
     {
       method: 'POST',
       headers: {
@@ -19,10 +19,10 @@ export async function generateStory({
         Authorization: `Bearer ${localStorage.getItem('token')}`,
       },
       body: JSON.stringify({
+        title,
         prompt,
         genre,
         contentRating,
-        modelId,
       }),
     }
   );
