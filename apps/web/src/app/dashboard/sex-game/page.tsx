@@ -105,8 +105,9 @@ export default function SexGamePage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const list = Array.isArray(res.data) ? res.data : res.data?.characters || [];
+      const safeList = Array.isArray(list) ? list : [];
       setCharacters(
-        list.map((c: any) => ({
+        safeList.map((c: any) => ({
           id: c.id,
           name: c.name,
           imageUrl: c.imageUrl,
@@ -454,7 +455,7 @@ export default function SexGamePage() {
               </p>
             </div>
 
-            {!game.sessionComplete && game.choices?.length > 0 && (
+            {!game.sessionComplete && Array.isArray(game.choices) && game.choices.length > 0 && (
               <div className="space-y-3">
                 <h3 className="text-lg font-medium text-purple-300">
                   What do you do?
