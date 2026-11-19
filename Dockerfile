@@ -2,7 +2,7 @@
 # Targets: api | worker
 # Build: docker build --target api -t img-vdo-api .
 
-ARG NODE_VERSION=20-alpine
+ARG NODE_VERSION=20-slim
 
 FROM node:${NODE_VERSION} AS deps
 WORKDIR /app
@@ -28,7 +28,8 @@ RUN npm run build --workspace=@img-vdo/shared \
 FROM node:${NODE_VERSION} AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-RUN addgroup -S app && adduser -S app -G app
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+RUN groupadd -r app && useradd -r -g app app
 
 FROM runtime AS api
 WORKDIR /app
