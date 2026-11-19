@@ -15,6 +15,7 @@ RUN groupadd -r app && useradd -r -g app app
 
 # -------- Build --------
 FROM deps AS build
+ARG CACHE_BUST=1
 COPY packages/shared ./packages/shared
 COPY packages/video-generator ./packages/video-generator
 COPY apps/api ./apps/api
