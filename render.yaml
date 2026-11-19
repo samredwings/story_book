@@ -1,0 +1,19 @@
+# Exported from Render on 2026-11-19T11:11:02Z
+version: "1"
+projects:
+- name: Storybook
+  environments:
+  - name: env
+    services:
+    - type: web
+      name: story_book
+      runtime: docker
+      repo: https://github.com/samredwings/story_book
+      plan: free
+      envVars:
+      - key: PORT
+        sync: false
+      region: oregon
+      dockerContext: .
+      dockerfilePath: ./Dockerfile
+      autoDeployTrigger: commit
